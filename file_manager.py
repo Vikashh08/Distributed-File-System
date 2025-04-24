@@ -3,6 +3,18 @@ import shutil
 from datetime import datetime
 import json
 from datetime import datetime
+# Add this at the top
+import shutil
+def get_metadata_keys():
+    metadata = load_metadata()
+    return list(metadata.keys())
+
+def remove_node_from_metadata(node_name):
+    metadata = load_metadata()
+    for filename, data in metadata.items():
+        if node_name in data["nodes"]:
+            data["nodes"].remove(node_name)
+    save_metadata(metadata)
 
 METADATA_FILE = 'metadata.json'
 
@@ -78,3 +90,46 @@ def retrieve_file(filename):
                 return send_file(file_path, as_attachment=True)
     return "❌ File unavailable due to node failure or no replicas.", 404
 
+def check_and_recover_files():
+    metadata = load_metadata()
+    desired_replicas = 2  # Minimum replicas required
+
+    for filename, data in metadata.copy().items():
+        # Physical file verification
+        valid_nodes = []
+        for node in data["nodes"]:
+            node_path = os.path.join(UPLOAD_FOLDER, node, filename)
+            if os.path.exists(node_path) and node_status.get(node, False):
+                valid_nodes.append(node)
+        
+        # Update metadata with only valid nodes
+        if len(valid_nodes) != len(data["nodes"]):
+            metadata[filename]["nodes"] = valid_nodes
+            save_metadata(metadata)
+
+        current_replicas = len(valid_nodes)
+        if current_replicas >= desired_replicas:
+            continue
+
+        # Find candidate nodes for replication
+        candidate_nodes = [node for node in NODES if node_status[node] and node not in valid_nodes]
+        needed = desired_replicas - current_replicas
+        selected_nodes = candidate_nodes[:needed]
+
+        if not selected_nodes:
+            continue  # No available nodes
+
+        # Find a valid source node
+        source_node = next((node for node in valid_nodes if node_status[node]), None)
+        if not source_node:
+            continue  # No source available
+
+        # Replicate to selected nodes
+        source_path = os.path.join(UPLOAD_FOLDER, source_node, filename)
+        for dest_node in selected_nodes:
+            dest_dir = os.path.join(UPLOAD_FOLDER, dest_node)
+            os.makedirs(dest_dir, exist_ok=True)
+            shutil.copy2(source_path, os.path.join(dest_dir, filename))
+            metadata[filename]["nodes"].append(dest_node)
+
+        save_metadata(metadata)
