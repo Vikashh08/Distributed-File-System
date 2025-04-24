@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Distributed File System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="container mt-5">
+    <h1>Distributed File System</h1>
+    <form method="post" action="/upload" enctype="multipart/form-data" class="my-3">
+        <input type="file" name="file" required>
+        <button type="submit" class="btn btn-primary">Upload</button>
+    </form>
+    <form method="get" onsubmit="event.preventDefault(); downloadFile();" class="my-3">
+        <input type="text" id="filename" placeholder="Enter filename to download" required>
+        <button type="submit" class="btn btn-success">Download</button>
+    </form>
+    
+    <script>
+    function downloadFile() {
+        const filename = document.getElementById('filename').value;
+        window.location.href = '/download/' + filename;
+    }
+    </script>
+    <h3 class="mt-5">📂 Files Stored in Nodes</h3>
+    <h5>🛠️ Toggle Node Status</h5>
+    <div class="mb-3">
+        {% for node_full in files_by_node.keys() %}
+            {% set node = node_full.split()[0] %}
+            <form action="{{ url_for('toggle_node', node_name=node) }}" method="post" style="display:inline-block; margin-right: 10px;">
+                <button class="btn {% if 'Active' in node_full %}btn-danger{% else %}btn-success{% endif %} btn-sm">
+                    {% if 'Active' in node_full %}Deactivate {{ node }}{% else %}Activate {{ node }}{% endif %}
+                </button>
+            </form>
+        {% endfor %}
+    </div>
+    
+
+
+    <div class="row">
+        {% for node, files in files_by_node.items() %}
+            <div class="col-md-4">
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white">{{ node }}</div>
+                    <div class="card-body">
+                        {% if files %}
+                        <ul>
+                            {% for file in files %}
+                                <li>
+                                    {{ file }}
+                                    <a href="{{ url_for('download', filename=file) }}" class="btn btn-link btn-sm">Download</a>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                        
+                        {% else %}
+                            <p>No files stored.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    
+    
+</body>
+</html>
